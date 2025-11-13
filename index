@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- 
+  [Gemini] 修改標題以反映住院藥局版本 
+-->
+<title>住院藥局儲位查詢 | Inpatient Pharmacy Finder</title>
+<style>
+:root {--bg:#0f172a;--card:#111827;--muted:#94a3b8;--text:#e5e7eb;--accent:#60a5fa;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI","Helvetica Neue",Arial;}
+.wrap{max-width:960px;margin:40px auto;padding:0 16px}
+.card{background:var(--card);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:20px}
+h1{margin:0 0 8px;font-size:22px}
+.sub{color:var(--muted);margin-bottom:16px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+input[type=text]{flex:1;min-width:220px;border:1px solid #1f2937;background:#0b1220;color:var(--text);
+  border-radius:12px;padding:12px 14px;font-size:16px;outline:none}
+input::placeholder{color:#64748b}
+button{background:var(--accent);border:0;color:#0b1220;padding:12px 16px;border-radius:12px;cursor:pointer;font-weight:700}
+button:disabled{opacity:.6;cursor:not-allowed}
+.meta{font-size:12px;color:var(--muted);margin-top:10px}
+table{width:100%;border-collapse:separate;border-spacing:0;margin-top:16px;word-break:break-all}
+th,td{padding:12px 8px;border-bottom:1px solid #1f2937;text-align:left;vertical-align:middle}
+th{font-weight:700;color:#cbd5e1}
+tr:hover{background:#0b1220}
+.badge{display:inline-block;background:#0b1220;border:1px solid #1f2937;color:#cbd5e1;border-radius:999px;padding:2px 8px;font-size:12px}
+.empty{color:var(--muted);padding:24px 8px;text-align:center}
+.err{color:#fecaca}
+.chk-cell{width:40px;text-align:center}
+.chk{width:18px;height:18px;cursor:pointer}
+.selected-header{display:flex;align-items:center;justify-content:space-between;margin-top:24px}
+.selected-count{font-size:14px;color:#cbd5e1}
+.pill{display:inline-block;background:#0b1220;border:1px solid #1f2937;color:#cbd5e1;border-radius:999px;padding:2px 10px;font-size:12px}
+.selected-actions{display:flex;gap:8px}
+.ghost{background:transparent;border:1px solid #334155;color:#cbd5e1}
+.mini{padding:8px 10px;font-size:14px}
+.selected-table td,.selected-table th{border-bottom:1px solid #1f2937}
+
+.qty-input{
+  width:60px;
+  border:1px solid #334155;
+  background:#0b1220;
+  color:#e5e7eb;
+  border-radius:8px;
+  padding:6px;
+  font-size:15px;
+  font-weight:600;
+  text-align:center;
+  outline:none;
+}
+.qty-input::-webkit-inner-spin-button,
+.qty-input::-webkit-outer-spin-button{
+  -webkit-appearance:none;margin:0;
+}
+
+.remove-btn{
+  background:transparent;
+  border:1px solid #334155;
+  color:#cbd5e1;
+  padding:4px 8px;
+  border-radius:8px;
+  cursor:pointer;
+  font-size:16px;
+  line-height:1;
+}
+.remove-btn:hover{background:#1f2937;border-color:#475569;color:#fca5a5}
+
+/* [Gemini] 新增單位選單的樣式 
+*/
+.unit-selector {
+  margin-bottom: 16px;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #1f2937;
+  padding-bottom: 16px;
+}
+.unit-selector label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 15px;
+}
+.unit-selector input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+@media (max-width:600px){
+  th,td{font-size:14px;padding:10px 6px;}
+  .qty-input{width:55px;font-size:15px;}
+  .remove-btn{padding:4px 6px;font-size:15px;}
+}
+</style>
+<script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0"></script>
+</head>
+<body>
+<div class="wrap"><div class="card">
+<h1>住院藥局儲位查詢</h1>
+<div class="sub">資料來源會自動抓取 GitHub 上 <span class="badge">main</span> 分支的最新住院藥局 Excel。</div>
+
+<!-- 
+  [Gemini] 新增單位選單 
+-->
+<div class="unit-selector">
+  <label><input type="radio" name="unit" value="general" checked> 一般調劑</label>
+  <label><input type="radio" name="unit" value="ud"> UD調劑</label>
+  <label><input type="radio" name="unit" value="firstdose"> 首日調劑</label>
+</div>
+
+<div class="row">
+  <input id="q" type="text" placeholder="輸入藥名（支援模糊搜尋與部分關鍵字）">
+  <button id="reloadBtn">重新整理</button>
+</div>
+<div id="meta" class="meta"></div><div id="error" class="meta err"></div>
+
+<table id="tbl">
+<thead><tr>
+  <th class="chk-cell"><input id="toggleAll" class="chk" type="checkbox"></th>
+  <th>藥品名稱</th>
+  <!-- [Gemini] 修改欄位名稱 -->
+  <th>儲位區</th>
+  <th>儲位代碼</th>
+</tr></thead>
+<tbody id="tbody"><tr><td colspan="4" class="empty">尚未載入資料…</td></tr></tbody>
+</table>
+
+<div class="selected-header">
+  <div class="selected-count">已選清單 <span id="selCount" class="pill">0</span></div>
+  <div class="selected-actions">
+    <button id="exportBtn" class="ghost mini">匯出 CSV</button>
+    <button id="clearBtn" class="ghost mini">全部清空</button>
+  </div>
+</div>
+
+<table class="selected-table">
+<thead><tr>
+  <th>藥品名稱</th>
+  <!-- [Gemini] 新增「單位」欄，並修改欄位名稱 -->
+  <th>單位</th>
+  <th>儲位區</th>
+  <th>儲位代碼</th>
+  <th>補充數量</th>
+  <th>操作</th>
+</tr></thead>
+<tbody id="selBody"><tr><td colspan="6" class="empty">尚無勾選項目</td></tr></tbody>
+</table>
+</div></div>
+
+<script>
+(()=> {
+// [Gemini] 更新 RAW_URL 以指向新的住院藥局 Excel 檔案
+// 注意：請確保檔案名稱與您 GitHub 上的名稱一致 (包含空格)
+// 這裡假設檔案名稱為 '儲位分配_1103 .xlsx'
+const RAW_URL="https://raw.githubusercontent.com/Almightyhao/Storage-Code-Finding/main/儲位分配_1103%20.xlsx";
+
+// [Gemini] 更新欄位關鍵字
+const NAME_KEYS=["藥名","品名","Drug","Name","名稱"];
+const G_AREA_KEYS = ["一般儲位區"];
+const G_CODE_KEYS = ["一般儲位區代碼"];
+const U_AREA_KEYS = ["UD儲位區"];
+const U_CODE_KEYS = ["UD儲位區代碼"];
+const F_AREA_KEYS = ["首日儲位區"];
+const F_CODE_KEYS = ["首日儲位區代碼"];
+
+const $q=document.getElementById("q"),$tbody=document.getElementById("tbody"),
+$meta=document.getElementById("meta"),$err=document.getElementById("error"),
+$reload=document.getElementById("reloadBtn"),$selBody=document.getElementById("selBody"),
+$selCount=document.getElementById("selCount"),$clearBtn=document.getElementById("clearBtn"),
+$exportBtn=document.getElementById("exportBtn"),
+$unitSelector=document.querySelector(".unit-selector");
+
+// [Gemini] allRows 儲存從 Excel 讀取的完整資料
+let allRows=[],fuse=null;
+// [Gemini] selected 改為 Map，儲存 { id -> { row: r, unit: 'general' } }
+// 這樣才能記住是從哪個單位選的
+const selected=new Map(),qtyMap=new Map();
+// [Gemini] 儲存目前選擇的單位
+let currentUnit = 'general';
+
+function pickKey(o,c){for(const k of c)if(k in o)return k;return null;}
+// [Gemini] rowId 現在只使用藥名
+function rowId(r){return r.name;}
+function escapeHTML(s){return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+
+// [Gemini] 新增輔助函數，根據單位取得對應的儲位資料
+function getUnitData(r, unit) {
+  if (!r) return { area: '', code: '' };
+  if (unit === 'ud') return { area: r.u_area, code: r.u_code };
+  if (unit === 'firstdose') return { area: r.f_area, code: r.f_code };
+  return { area: r.g_area, code: r.g_code }; // 預設為 'general'
+}
+// [Gemini] 新增輔助函數，取得單位名稱
+function getUnitName(unit) {
+  if (unit === 'ud') return 'UD';
+  if (unit === 'firstdose') return '首日';
+  return '一般';
+}
+
+async function loadExcel(){
+  $err.textContent="";$reload.disabled=true;$reload.textContent="載入中…";
+  try{
+    const r=await fetch(RAW_URL+"?t="+Date.now());
+    if(!r.ok)throw new Error("讀取失敗 "+r.status);
+    const buf=await r.arrayBuffer();
+    const wb=XLSX.read(buf,{type:"array"});
+    const sh=wb.Sheets[wb.SheetNames[0]];
+    const js=XLSX.utils.sheet_to_json(sh,{defval:""});
+    if(!js.length)throw new Error("Excel 為空");
+    
+    // [Gemini] 讀取所有單位的欄位
+    const kN=pickKey(js[0],NAME_KEYS);
+    const kGA=pickKey(js[0],G_AREA_KEYS), kGC=pickKey(js[0],G_CODE_KEYS);
+    const kUA=pickKey(js[0],U_AREA_KEYS), kUC=pickKey(js[0],U_CODE_KEYS);
+    const kFA=pickKey(js[0],F_AREA_KEYS), kFC=pickKey(js[0],F_CODE_KEYS);
+    
+    // 檢查關鍵欄位是否存在
+    if (!kN || (!kGC && !kUC && !kFC)) {
+      throw new Error("Excel 欄位不符，缺少 '藥名' 或所有 '代碼' 欄位。");
+    }
+
+    // [Gemini] 建立 allRows，包含所有單位的資料
+    allRows=js.map(r=>({
+      name: String(r[kN]??"").trim(),
+      g_area: String(r[kGA]??"").trim(),
+      g_code: String(r[kGC]??"").trim(),
+      u_area: String(r[kUA]??"").trim(),
+      u_code: String(r[kUC]??"").trim(),
+      f_area: String(r[kFA]??"").trim(),
+      f_code: String(r[kFC]??"").trim()
+    })).filter(r=>r.name);
+    
+    // [Gemini] Fuse 索引建立在 allRows 上
+    fuse=new Fuse(allRows,{includeScore:true,threshold:0.3,keys:["name"]});
+    
+    $meta.textContent=`共 ${allRows.length} 筆 · 載入時間：${new Date().toLocaleString()}`;
+    render([]);renderSel();
+  }catch(e){$err.textContent="錯誤："+e.message;$tbody.innerHTML='<tr><td colspan="4" class="empty">無法載入資料</td></tr>';}
+  $reload.disabled=false;$reload.textContent="重新整理";
+}
+
+function render(list){
+  if(!list.length){$tbody.innerHTML='<tr><td colspan="4" class="empty">請輸入關鍵字查詢</td></tr>';return;}
+  
+  // [Gemini] 根據 currentUnit 顯示不同的儲位
+  $tbody.innerHTML=list.map(r=>{
+    const id=rowId(r);
+    const chk=selected.has(id)?"checked":"";
+    // [Gemini] 取得目前選擇單位的資料
+    const { area, code } = getUnitData(r, currentUnit);
+    
+    return `<tr data-id="${escapeHTML(id)}">
+      <td class="chk-cell"><input type="checkbox" class="chk" ${chk}></td>
+      <td>${escapeHTML(r.name)}</td>
+      <td>${escapeHTML(area)}</td>
+      <td>${escapeHTML(code)}</td>
+    </tr>`;
+  }).join("");
+}
+
+$q.addEventListener("input",()=>{
+  const kw=$q.value.trim();
+  if(!kw){render([]);return;}
+  // [Gemini] 搜尋改為 allRows
+  const out=allRows.filter(r=>r.name.toLowerCase().includes(kw.toLowerCase()));
+  render(out.length?out:(fuse?fuse.search(kw).map(x=>x.item):[]));
+});
+
+// [Gemini] 監聽單位選單變化
+$unitSelector.addEventListener("change", e => {
+  if (e.target.name === 'unit') {
+    currentUnit = e.target.value;
+    // 重新觸發搜尋，以更新顯示的儲位
+    const kw = $q.value.trim();
+    if (kw) {
+      // 觸發 input 事件來重新搜尋和渲染
+      $q.dispatchEvent(new Event('input', { bubbles: true }));
+    } else {
+      render([]); // 如果搜尋框是空的，清空結果
+    }
+  }
+});
+
+$tbody.addEventListener("change",e=>{
+  const el=e.target;if(!el.classList.contains("chk"))return;
+  const tr=el.closest("tr");const id=tr.getAttribute("data-id");
+  
+  // [Gemini] 更新 selected Map
+  if(el.checked){
+    // 找到完整的 row 物件並存入 Map
+    const rowData = allRows.find(r => rowId(r) === id);
+    if (rowData) {
+      selected.set(id, { row: rowData, unit: currentUnit });
+    }
+  }else{
+    selected.delete(id);
+    qtyMap.delete(id);
+  }
+  renderSel();
+  // [Gemini] 更新搜尋列表中的勾選狀態 (避免切換單位後勾選狀態不符)
+  // 這一步驟是必要的，因為 render() 會根據 selected.has(id) 來決定是否 checked
+  // 而我們剛剛修改了 selected
+  const kw = $q.value.trim();
+  if (kw) { $q.dispatchEvent(new Event('input', { bubbles: true })); }
+});
+
+function renderSel(){
+  // [Gemini] 檢查 selected.size
+  if(!selected.size){$selBody.innerHTML='<tr><td colspan="6" class="empty">尚無勾選項目</td></tr>';return;}
+  
+  let html = [];
+  // [Gemini] 遍歷 Map
+  for (const [id, selData] of selected.entries()) {
+    const { row, unit } = selData;
+    const { area, code } = getUnitData(row, unit);
+    const unitName = getUnitName(unit);
+    const qty=qtyMap.get(id)??"";
+    
+    html.push(`<tr data-id="${escapeHTML(id)}">
+      <td>${escapeHTML(row.name)}</td>
+      <td><span class="pill">${escapeHTML(unitName)}</span></td>
+      <td>${escapeHTML(area)}</td>
+      <td>${escapeHTML(code)}</td>
+      <td><input class="qty-input" type="number" min="0" max="999" value="${escapeHTML(String(qty))}" data-qty="${escapeHTML(id)}"></td>
+      <td><button class="remove-btn" data-remove="${escapeHTML(id)}">❌</button></td>
+    </tr>`);
+  }
+  $selBody.innerHTML = html.join("");
+  $selCount.textContent=selected.size;
+}
+
+$selBody.addEventListener("input",e=>{
+  const el=e.target.closest("input[data-qty]");if(!el)return;
+  // [Gemini] id (藥名) 是正確的 key
+  const id=el.getAttribute("data-qty"),v=el.value.trim();
+  if(v==="")qtyMap.delete(id);else qtyMap.set(id,Math.min(Number(v)||0,999));
+});
+
+$selBody.addEventListener("click",e=>{
+  const btn=e.target.closest("button[data-remove]");if(!btn)return;
+  // [Gemini] id (藥名) 是正確的 key
+  const id=btn.getAttribute("data-remove");
+  selected.delete(id);
+  qtyMap.delete(id);
+  renderSel();
+  // [Gemini] 同步更新搜尋列表的勾選狀態
+  const kw = $q.value.trim();
+  if (kw) { $q.dispatchEvent(new Event('input', { bubbles: true })); }
+});
+
+$clearBtn.addEventListener("click",()=>{
+  selected.clear();
+  qtyMap.clear();
+  renderSel();
+  // [Gemini] 同步更新搜尋列表的勾選狀態
+  const kw = $q.value.trim();
+  if (kw) { $q.dispatchEvent(new Event('input', { bubbles: true })); }
+});
+
+$exportBtn.addEventListener("click",()=>{
+  if(!selected.size)return;
+  
+  // [Gemini] 更新 CSV 標頭
+  const csvHeader = ["藥品名稱,單位,儲位區,儲位代碼,補充數量"];
+  const csvRows = [];
+  
+  // [Gemini] 從 selected Map 產生 CSV 內容
+  for (const [id, selData] of selected.entries()) {
+    const { row, unit } = selData;
+    const { area, code } = getUnitData(row, unit);
+    const unitName = getUnitName(unit);
+    const qty = qtyMap.get(id) ?? "";
+    const csvRow = [row.name, unitName, area, code, qty]
+      .map(x=>`"${String(x).replace(/"/g,'""')}"`)
+      .join(",");
+    csvRows.push(csvRow);
+  }
+
+  const csv= [csvHeader, ...csvRows].join("\r\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="住院藥局選取清單.csv";a.click();
+});
+
+$reload.addEventListener("click",loadExcel);
+loadExcel();
+})();
+</script>
+
+<!-- 🔗 底部資訊 -->
+<footer style="text-align:center;margin:24px 0;color:#94a3b8;font-size:13px">
+  本工具原始碼與更新版可於 
+  <a href="https://github.com/Almightyhao/Storage-Code-Finding" 
+     target="_blank" 
+     style="color:#60a5fa;text-decoration:none">
+     GitHub：Almightyhao/Storage-Code-Finding
+  </a> 查找。
+</footer>
+
+</body>
+</html>
