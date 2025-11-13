@@ -23,7 +23,7 @@
 ## 💡 使用方式
 
 1. 開啟網頁
-   👉 [**Inpatient Storage Code Finder**](https://almightyhao.github.io/Storage-Code-Finding/Storage%20Code%20Finding.html)
+   👉 [**IPD Storage Code Finder**](https://almightyhao.github.io/Storage-Code-Finding/Storage%20Code%20Finding.html)
 2. 選擇調劑單位：「一般調劑」、「UD調劑」或「首日調劑」。
 3. 在輸入框輸入藥名（完整或部分關鍵字）。
 4. 點選 **「重新整理」** 可重新抓取最新 Excel。
