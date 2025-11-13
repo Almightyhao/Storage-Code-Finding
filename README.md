@@ -1,4 +1,4 @@
-# 🏥 住院藥局儲位查詢 (Inpatient Pharmacy Storage Code Finder)
+# 🏥 住院藥局儲位查詢 (IPD Storage Code Finder)
 
 住院藥局藥品儲位查詢工具（**1113 版本**）
 
