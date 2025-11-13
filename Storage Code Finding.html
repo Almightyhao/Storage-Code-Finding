@@ -10,7 +10,6 @@
 
 <!-- 
   [Gemini] 新增：網頁 App 圖示 (Web App Icons)
-  請將下面這段程式碼加入到 <head> 標籤內。
   
   **重要前提**：
   您必須將 'IPD.jpg' 檔案上傳到 GitHub 儲存庫的根目錄 (main 分支)。
@@ -258,7 +257,7 @@ async function loadExcel(){
       f_code: String(r[kFC]??"").trim()
     })).filter(r=>r.name);
     
-    // [Gemini] Fuse 索引建立在 allRows 上
+    // [GemD[Gemini] Fuse 索引建立在 allRows 上
     fuse=new Fuse(allRows,{includeScore:true,threshold:0.3,keys:["name"]});
     
     $meta.textContent=`共 ${allRows.length} 筆 · 載入時間：${new Date().toLocaleString()}`;
