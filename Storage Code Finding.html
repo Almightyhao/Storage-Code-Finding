@@ -164,7 +164,7 @@ tr:hover{background:#0b1220}
 
 <table class="selected-table">
 <thead><tr>
-  <th>藥品名稱</th>
+  <th>藥品名称</th>
   <!-- [Gemini] 新增「單位」欄，並修改欄位名稱 -->
   <th>單位</th>
   <th>儲位區</th>
@@ -257,7 +257,7 @@ async function loadExcel(){
       f_code: String(r[kFC]??"").trim()
     })).filter(r=>r.name);
     
-    // [GemD[Gemini] Fuse 索引建立在 allRows 上
+    // [Gemini] Fuse 索引建立在 allRows 上
     fuse=new Fuse(allRows,{includeScore:true,threshold:0.3,keys:["name"]});
     
     $meta.textContent=`共 ${allRows.length} 筆 · 載入時間：${new Date().toLocaleString()}`;
