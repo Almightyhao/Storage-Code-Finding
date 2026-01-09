@@ -345,4 +345,28 @@ $exportBtn.addEventListener("click",()=>{
     const unitName = getUnitName(unit);
     const qty = qtyMap.get(id) ?? "";
     const csvRow = [row.name, unitName, code, qty]
-      .map(
+      .map(x=>`"${String(x).replace(/"/g,'""')}"`)
+      .join(",");
+    csvRows.push(csvRow);
+  }
+
+  const csv= [csvHeader, ...csvRows].join("\r\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="住院藥局選取清單.csv";a.click();
+});
+
+$reload.addEventListener("click",loadExcel);
+loadExcel();
+})();
+</script>
+
+<footer style="text-align:center;margin:24px 0;color:#94a3b8;font-size:13px">
+  本工具原始碼與更新版可於 
+  <a href="https://github.com/Almightyhao/Storage-Code-Finding" 
+     target="_blank" 
+     style="color:#60a5fa;text-decoration:none">
+     GitHub：Almightyhao/Storage-Code-Finding
+  </a> 查找。
+</footer>
+</body>
+</html>
